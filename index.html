@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Control de Matafuegos v3 — CoopMorteros</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --y:#D4B800;--y-l:#FFFAE0;--y-d:#9E8A00;
+  --negro:#1A1A1A;--g-osc:#2C2C2C;--gris:#6B6B6B;
+  --g-med:#ADADAD;--g-cla:#E8E8E8;--fondo:#F2F2F0;--blanco:#FFFFFF;
+  --rojo:#B83228;--rojo-l:#FDE8E7;
+  --naranja:#D4691A;--naranja-l:#FEF0E3;
+  --verde:#1E9154;--verde-l:#E5F8EE;
+  --azul:#1F6FAB;--azul-l:#E5F2FB;
+  --violeta:#6B48C8;--violeta-l:#F0EDFB;
+  --r:8px;--r-lg:14px;--r-xl:20px;
+  --sh:0 1px 4px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.07);
+  --sh-lg:0 8px 40px rgba(0,0,0,.14);
+  --font:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',monospace;
+  --nav-h:62px;--header-h:60px;
+}
+html{font-size:16px;background:var(--fondo);-webkit-text-size-adjust:100%}
+body{font-family:var(--font);color:var(--negro);line-height:1.55;min-height:100vh;
+  padding-top:calc(var(--header-h)+var(--nav-h));padding-bottom:env(safe-area-inset-bottom,0)}
+@media(min-width:600px){:root{--nav-h:66px;--header-h:64px}html{font-size:17px}}
+@media(min-width:900px){:root{--nav-h:60px;--header-h:60px}html{font-size:16px}}
+
+.loading-overlay{position:fixed;inset:0;background:var(--negro);display:flex;
+  align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:1rem}
+.loading-overlay.hidden{display:none}
+.loading-spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.2);
+  border-top-color:var(--y);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{color:rgba(255,255,255,.6);font-size:14px}
+
+.header{position:fixed;top:0;left:0;right:0;height:var(--header-h);
+  background:var(--negro);display:flex;align-items:center;padding:0 1.25rem;gap:12px;z-index:200}
+.header-logo{font-size:15px;font-weight:700;color:var(--y);letter-spacing:.02em;white-space:nowrap}
+.header-sep{width:1px;height:22px;background:rgba(255,255,255,.15);flex-shrink:0}
+.header-title{font-size:13px;font-weight:500;color:rgba(255,255,255,.5);
+  letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;display:none}
+@media(min-width:440px){.header-title{display:block}}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.header-badge{font-size:12px;font-weight:600;padding:4px 12px;border-radius:99px;white-space:nowrap}
+.hb-ok{background:var(--verde);color:#fff}
+.hb-alerta{background:var(--y);color:var(--negro)}
+.hb-critico{background:var(--rojo);color:#fff;animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.75}}
+.header-ver{font-size:10px;color:rgba(255,255,255,.3);font-family:var(--mono)}
+
+.nav{position:fixed;top:var(--header-h);left:0;right:0;height:var(--nav-h);
+  background:var(--blanco);border-bottom:1px solid var(--g-cla);display:flex;overflow-x:auto;scrollbar-width:none;z-index:199}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{flex:1;min-width:68px;max-width:130px;padding:8px 4px 6px;font-family:var(--font);
+  font-size:10px;font-weight:500;color:var(--gris);background:none;border:none;
+  border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;transition:all .15s;
+  display:flex;flex-direction:column;align-items:center;gap:2px;-webkit-tap-highlight-color:transparent}
+.nav-btn .ni{font-size:20px;line-height:1}
+@media(min-width:600px){.nav-btn{font-size:12px;min-width:90px}.nav-btn .ni{font-size:23px}}
+.nav-btn.active{color:var(--negro);border-bottom-color:var(--y)}
+.nav-btn:active{background:var(--fondo)}
+
+.view{display:none;padding:1rem;max-width:1000px;margin:0 auto;animation:fadeIn .15s ease}
+.view.active{display:block}
+@media(min-width:600px){.view{padding:1.25rem}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;margin-bottom:1rem}
+@media(min-width:600px){.metrics{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:900px){.metrics{grid-template-columns:repeat(5,1fr)}}
+.metric{background:var(--blanco);border-radius:var(--r-lg);padding:.9rem 1rem;box-shadow:var(--sh);border-top:3px solid var(--g-cla)}
+.metric.m-rojo{border-top-color:var(--rojo)}.metric.m-naranja{border-top-color:var(--naranja)}
+.metric.m-verde{border-top-color:var(--verde)}.metric.m-azul{border-top-color:var(--azul)}
+.metric.m-violeta{border-top-color:var(--violeta)}
+.metric-num{font-size:30px;font-weight:600;font-family:var(--mono);line-height:1}
+.metric.m-rojo .metric-num{color:var(--rojo)}.metric.m-naranja .metric-num{color:var(--naranja)}
+.metric.m-verde .metric-num{color:var(--verde)}.metric.m-violeta .metric-num{color:var(--violeta)}
+.metric-lbl{font-size:12px;color:var(--gris);margin-top:3px;font-weight:500}
+
+.card{background:var(--blanco);border-radius:var(--r-lg);padding:1rem 1.1rem;box-shadow:var(--sh);margin-bottom:.85rem}
+@media(min-width:600px){.card{padding:1.15rem 1.35rem}}
+.card-title{font-size:12px;font-weight:600;color:var(--gris);text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:.7rem;display:flex;align-items:center;gap:6px}
+
+.alerta{display:flex;align-items:flex-start;gap:10px;padding:.75rem 1rem;border-radius:var(--r);
+  margin-bottom:.4rem;cursor:pointer;border-left:4px solid transparent;transition:opacity .1s}
+.alerta:active{opacity:.85}
+.alerta.a-rojo{background:var(--rojo-l);border-left-color:var(--rojo)}
+.alerta.a-naranja{background:var(--naranja-l);border-left-color:var(--naranja)}
+.alerta.a-violeta{background:var(--violeta-l);border-left-color:var(--violeta)}
+.alerta-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.a-rojo .alerta-dot{background:var(--rojo)}.a-naranja .alerta-dot{background:var(--naranja)}.a-violeta .alerta-dot{background:var(--violeta)}
+.alerta-txt p{font-size:14px;font-weight:600}
+.alerta-txt small{font-size:13px;color:var(--gris)}
+.empty-ok{background:var(--verde-l);border-radius:var(--r);padding:1rem;text-align:center;color:var(--verde);font-size:13px;font-weight:500;border:1px solid #b8e8cc}
+
+.filtros{display:flex;gap:.5rem;margin-bottom:.85rem;flex-wrap:wrap;background:var(--blanco);border-radius:var(--r-lg);padding:.85rem;box-shadow:var(--sh)}
+.fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px}
+.fg label{font-size:11px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.06em}
+.fg select,.fg input[type=text]{font-family:var(--font);font-size:14px;padding:9px 11px;
+  border:1px solid var(--g-cla);border-radius:var(--r);background:var(--fondo);color:var(--negro);outline:none;min-height:44px}
+.fg select:focus,.fg input:focus{border-color:var(--y)}
+
+.tbl-wrap{background:var(--blanco);border-radius:var(--r-lg);box-shadow:var(--sh);overflow:hidden}
+.tbl-header{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.25rem;border-bottom:1px solid var(--g-cla);gap:8px;flex-wrap:wrap}
+.tbl-header h3{font-size:15px;font-weight:600}
+.tbl-count{font-size:12px;font-family:var(--mono);background:var(--fondo);padding:2px 10px;border-radius:99px;color:var(--gris)}
+.tbl-scroll{overflow-x:auto}
+.dtbl{width:100%;border-collapse:collapse;font-size:13px;display:none}
+@media(min-width:760px){.dtbl{display:table}}
+.dtbl th{padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--g-cla);background:var(--fondo);white-space:nowrap}
+.dtbl td{padding:10px 12px;border-bottom:1px solid var(--g-cla);vertical-align:middle}
+.dtbl tr:last-child td{border-bottom:none}
+.dtbl tr:hover td{background:var(--fondo)}
+.dtbl tr.ev td:first-child{border-left:3px solid var(--rojo)}
+.dtbl tr.ep td:first-child{border-left:3px solid var(--naranja)}
+.dtbl tr.eg td:first-child{border-left:3px solid var(--verde)}
+.dtbl tr.erecip td:first-child{border-left:3px solid var(--violeta)}
+
+.ext-chip{display:inline-flex;align-items:center;gap:4px;background:var(--negro);color:var(--blanco);font-family:var(--mono);font-size:12px;font-weight:500;padding:4px 10px;border-radius:99px;white-space:nowrap}
+.ext-chip.sin{background:var(--g-med);font-style:italic}
+.anio-chip{display:inline-flex;align-items:center;font-size:11px;font-weight:600;padding:3px 8px;border-radius:5px;white-space:nowrap}
+.anio-ok{background:var(--azul-l);color:var(--azul)}.anio-warn{background:var(--naranja-l);color:var(--naranja)}.anio-venc{background:var(--violeta-l);color:var(--violeta)}
+
+.mcards{display:flex;flex-direction:column}
+@media(min-width:760px){.mcards{display:none}}
+.mcard{padding:1rem 1.1rem;border-bottom:1px solid var(--g-cla);border-left:5px solid transparent}
+.mcard:last-child{border-bottom:none}
+.mcard.ev{border-left-color:var(--rojo);background:var(--rojo-l)}
+.mcard.ep{border-left-color:var(--naranja);background:var(--naranja-l)}
+.mcard.eg{border-left-color:var(--verde)}
+.mcard.erecip{border-left-color:var(--violeta);background:var(--violeta-l)}
+.mcard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;min-height:48px}
+.mcard-left{flex:1}
+.mcard-id{font-size:12px;font-family:var(--mono);color:var(--gris);margin-bottom:2px}
+.mcard-sector{font-size:16px;font-weight:600;margin-bottom:5px}
+.mcard-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:5px}
+.mcard-info{font-size:13px;color:var(--gris);display:flex;flex-wrap:wrap;gap:3px 10px}
+.mcard-chevron{font-size:22px;color:var(--gris);transition:transform .2s;flex-shrink:0;padding-top:2px}
+.mcard.expanded .mcard-chevron{transform:rotate(180deg)}
+.mcard-detail{display:none;margin-top:.9rem;border-top:1px solid rgba(0,0,0,.08);padding-top:.9rem}
+.mcard.expanded .mcard-detail{display:block}
+.estado-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.65rem}
+@media(min-width:600px){.estado-grid{grid-template-columns:repeat(3,1fr)}}
+.estado-item{background:var(--fondo);border-radius:var(--r);padding:.55rem .75rem;border-left:3px solid var(--g-cla)}
+.estado-item.ei-ok{border-left-color:var(--verde)}.estado-item.ei-warn{border-left-color:var(--naranja)}
+.estado-item.ei-mal{border-left-color:var(--rojo)}.estado-item.ei-na{border-left-color:var(--g-med)}
+.ei-lbl{font-size:10px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.ei-val{font-size:14px;font-weight:600}
+.obs-box{background:var(--y-l);border:1px solid var(--y-d);border-radius:var(--r);padding:.55rem .75rem;font-size:13px;color:var(--g-osc);margin-bottom:.65rem;line-height:1.4}
+.obs-box strong{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--y-d);margin-bottom:2px}
+.mcard-actions{display:flex;gap:.35rem;flex-wrap:wrap}
+
+.form-card{background:var(--blanco);border-radius:var(--r-lg);padding:1.1rem;box-shadow:var(--sh)}
+@media(min-width:600px){.form-card{padding:1.5rem}}
+.form-card h2{font-size:17px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:7px}
+.form-grid{display:grid;grid-template-columns:1fr;gap:.85rem}
+@media(min-width:600px){.form-grid{grid-template-columns:1fr 1fr;gap:1rem}}
+.fg-form{display:flex;flex-direction:column;gap:5px}
+.fg-form.full{grid-column:1/-1}
+.fg-form label{font-size:12px;font-weight:700;color:var(--g-osc);text-transform:uppercase;letter-spacing:.05em}
+.fg-form label .req{color:var(--rojo)}
+.fg-form input,.fg-form select,.fg-form textarea{font-family:var(--font);font-size:16px;padding:12px 13px;
+  border:1.5px solid var(--g-cla);border-radius:var(--r);background:var(--fondo);color:var(--negro);
+  transition:border-color .15s;outline:none;width:100%;min-height:50px}
+.fg-form input:focus,.fg-form select:focus,.fg-form textarea:focus{border-color:var(--y);background:var(--blanco)}
+.fg-form input.err,.fg-form select.err{border-color:var(--rojo)!important}
+.fg-form .hint{font-size:12px;color:var(--gris)}
+.fg-form .hint.hint-warn{color:var(--naranja);font-weight:600}
+.fg-form .hint.hint-viol{color:var(--violeta);font-weight:600}
+.fg-form .err-msg{font-size:12px;color:var(--rojo);display:none}
+.fg-form.has-err .err-msg{display:block}
+.fg-form textarea{min-height:80px;resize:vertical}
+.radio-row{display:flex;gap:.4rem;flex-wrap:wrap}
+.rl{display:flex;align-items:center;gap:6px;background:var(--fondo);border:1.5px solid var(--g-cla);
+  border-radius:var(--r);padding:11px 13px;cursor:pointer;font-size:14px;font-weight:500;
+  transition:all .15s;flex:1;min-width:75px;min-height:50px;user-select:none;-webkit-tap-highlight-color:transparent}
+.rl input[type=radio]{display:none}
+.rl:has(input:checked){background:var(--negro);color:var(--blanco);border-color:var(--negro)}
+.form-section{grid-column:1/-1;border-top:1px solid var(--g-cla);padding-top:.85rem;margin-top:.1rem}
+.form-section-title{font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.7rem;display:flex;align-items:center;gap:6px}
+.form-actions{display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap}
+.form-msg{margin-top:.5rem;font-size:13px;display:none;padding:.6rem .9rem;border-radius:var(--r)}
+.form-msg.ok{background:var(--verde-l);color:var(--verde)}
+.form-msg.err{background:var(--rojo-l);color:var(--rojo)}
+.form-msg.warn{background:var(--naranja-l);color:var(--naranja)}
+
+.btn{font-family:var(--font);font-size:14px;font-weight:600;padding:12px 18px;border-radius:var(--r);
+  border:none;cursor:pointer;transition:all .12s;display:inline-flex;align-items:center;gap:6px;
+  white-space:nowrap;min-height:46px;-webkit-tap-highlight-color:transparent}
+@media(min-width:600px){.btn{font-size:15px;min-height:50px}}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--y);color:var(--negro)}.btn-primary:hover{background:var(--y-d)}
+.btn-ghost{background:var(--g-cla);color:var(--negro)}.btn-ghost:hover{background:#d4d4d4}
+.btn-danger{background:var(--rojo-l);color:var(--rojo)}
+.btn-dark{background:var(--negro);color:var(--blanco)}.btn-dark:hover{background:var(--g-osc)}
+.btn-verde{background:var(--verde-l);color:var(--verde)}
+.btn-sm{font-size:13px;padding:9px 13px;border-radius:7px;min-height:40px}
+@media(min-width:600px){.btn-sm{font-size:14px;min-height:44px}}
+
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.bv{background:var(--rojo);color:#fff}.bp{background:var(--naranja);color:#fff}
+.bg-ok{background:var(--verde);color:#fff}.b-gray{background:var(--g-cla);color:var(--gris)}
+.b-viol{background:var(--violeta);color:#fff}
+.tag{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:3px 8px;border-radius:5px}
+.t-si{background:#e0f7ed;color:#145c32}.t-no{background:var(--rojo-l);color:var(--rojo)}
+.t-rev{background:var(--naranja-l);color:var(--naranja)}
+
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:flex-end;justify-content:center;padding:0}
+.modal-bg.open{display:flex}
+@media(min-width:600px){.modal-bg{align-items:center;padding:1.5rem}}
+.modal{background:var(--blanco);width:100%;max-width:640px;max-height:92vh;overflow-y:auto;
+  border-radius:var(--r-xl) var(--r-xl) 0 0;box-shadow:var(--sh-lg);animation:slideUp .2s ease}
+@media(min-width:600px){.modal{border-radius:var(--r-xl);animation:fadeIn .18s ease}}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.modal-drag{width:44px;height:5px;background:var(--g-cla);border-radius:99px;margin:.9rem auto .5rem;display:block}
+@media(min-width:600px){.modal-drag{display:none}}
+.modal-hd{padding:1rem 1.25rem;border-bottom:1px solid var(--g-cla);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--blanco);z-index:1}
+.modal-hd h3{font-size:17px;font-weight:600}
+.modal-close{width:36px;height:36px;border-radius:99px;background:var(--fondo);border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gris);flex-shrink:0}
+.modal-body{padding:1.25rem}
+.modal-ft{padding:1rem 1.25rem;border-top:1px solid var(--g-cla);display:flex;gap:.5rem;flex-wrap:wrap}
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.85rem}
+.di{background:var(--fondo);border-radius:var(--r);padding:.65rem .9rem}
+.di.full{grid-column:1/-1}
+.di.warn-block{background:var(--naranja-l);border-left:3px solid var(--naranja)}
+.di.err-block{background:var(--rojo-l);border-left:3px solid var(--rojo)}
+.di.viol-block{background:var(--violeta-l);border-left:3px solid var(--violeta)}
+.di-lbl{font-size:11px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.di-val{font-size:15px;font-weight:500}
+.dias-badge{font-size:11px;font-weight:600;padding:2px 6px;border-radius:5px;margin-left:5px}
+.db-ok{background:var(--verde-l);color:var(--verde)}.db-prox{background:var(--naranja-l);color:var(--naranja)}.db-venc{background:var(--rojo-l);color:var(--rojo)}
+.hist-list{max-height:220px;overflow-y:auto}
+.hist-item{display:flex;gap:10px;padding:.55rem 0;border-bottom:1px solid var(--g-cla);font-size:13px}
+.hist-item:last-child{border-bottom:none}
+.hist-fecha{color:var(--gris);min-width:82px;font-family:var(--mono);flex-shrink:0}
+.hist-body{flex:1}.hist-tipo{font-weight:600;margin-bottom:1px}.hist-obs{color:var(--gris)}
+
+.rec-card{background:var(--blanco);border-radius:var(--r-lg);border-left:5px solid var(--g-cla);box-shadow:var(--sh);margin-bottom:.75rem;overflow:hidden}
+.rec-card.rv{border-left-color:var(--rojo)}.rec-card.rp{border-left-color:var(--naranja)}.rec-card.rg{border-left-color:var(--verde)}
+.rec-card.done{opacity:.6}
+.rec-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:.9rem 1rem .5rem;cursor:pointer;min-height:54px}
+.rec-header-txt{flex:1}
+.rec-id{font-size:12px;font-family:var(--mono);color:var(--gris);margin-bottom:1px}
+.rec-sector{font-size:16px;font-weight:600}
+.rec-sub{font-size:13px;color:var(--gris);margin-top:2px}
+.rec-body{padding:0 1rem 1rem;display:none}
+.rec-card.expanded .rec-body{display:block}
+.rec-chevron{font-size:20px;color:var(--gris);transition:transform .2s;flex-shrink:0;margin-top:2px}
+.rec-card.expanded .rec-chevron{transform:rotate(180deg)}
+.rec-acciones{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.6rem}
+@media(min-width:540px){.rec-acciones{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:760px){.rec-acciones{grid-template-columns:repeat(4,1fr)}}
+.rec-btn{font-family:var(--font);font-size:13px;font-weight:600;padding:12px 8px;border-radius:var(--r);
+  border:1.5px solid var(--g-cla);background:var(--fondo);color:var(--gris);cursor:pointer;text-align:center;
+  transition:all .12s;min-height:50px;-webkit-tap-highlight-color:transparent}
+.rec-btn:active{transform:scale(.97)}
+.rec-btn.sel-ok{background:var(--verde-l);color:var(--verde);border-color:var(--verde)}
+.rec-btn.sel-mal{background:var(--rojo-l);color:var(--rojo);border-color:var(--rojo)}
+.rec-btn.sel-warn{background:var(--naranja-l);color:var(--naranja);border-color:var(--naranja)}
+.rec-obs{width:100%;font-family:var(--font);font-size:15px;padding:10px 12px;border:1.5px solid var(--g-cla);
+  border-radius:var(--r);background:var(--fondo);color:var(--negro);resize:none;min-height:64px;margin-bottom:.6rem;outline:none}
+.rec-obs:focus{border-color:var(--y)}
+.rec-done-bar{padding:.5rem 1rem;background:var(--verde-l);color:var(--verde);font-size:13px;font-weight:600;display:none;align-items:center;gap:6px}
+.rec-card.done .rec-done-bar{display:flex}
+.rec-prog{background:var(--blanco);border-radius:var(--r);box-shadow:var(--sh);padding:.85rem 1.1rem;margin-bottom:.85rem}
+.prog-bar-wrap{height:9px;background:var(--g-cla);border-radius:99px;overflow:hidden;margin:.4rem 0}
+.prog-bar-fill{height:100%;border-radius:99px;background:var(--verde);transition:width .3s}
+
+.rpt-wrap{background:var(--blanco);border-radius:var(--r-lg);box-shadow:var(--sh);overflow:hidden;margin-bottom:.85rem}
+.rpt-hd{padding:1rem 1.25rem;border-bottom:1px solid var(--g-cla);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
+.rpt-hd h3{font-size:15px;font-weight:700}
+.rpt-count{font-size:12px;font-family:var(--mono);background:var(--fondo);padding:2px 10px;border-radius:99px;color:var(--gris)}
+.rpt-empty{padding:2rem 1.25rem;text-align:center;color:var(--verde);font-size:14px;font-weight:500}
+.rpt-item{padding:.85rem 1.25rem;border-bottom:1px solid var(--g-cla);display:flex;gap:.85rem;align-items:flex-start}
+.rpt-item:last-child{border-bottom:none}
+.rpt-priority{width:8px;flex-shrink:0;border-radius:4px;align-self:stretch;min-height:40px}
+.rpt-priority.p-critico{background:var(--rojo)}.rpt-priority.p-alto{background:var(--naranja)}
+.rpt-priority.p-medio{background:var(--y)}.rpt-priority.p-bajo{background:var(--g-cla)}
+.rpt-item-num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--blanco);background:var(--negro);border-radius:6px;padding:4px 8px;white-space:nowrap;flex-shrink:0;align-self:flex-start;margin-top:2px}
+.rpt-item-body{flex:1}
+.rpt-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem}
+.rpt-item-sector{font-size:15px;font-weight:700}
+.rpt-item-meta{font-size:12px;color:var(--gris);margin-bottom:.4rem}
+.rpt-issues{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.35rem}
+.rpt-issue{font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px}
+.ri-venc{background:var(--rojo);color:#fff}.ri-prox{background:var(--naranja);color:#fff}
+.ri-recip{background:var(--violeta);color:#fff}.ri-fisico{background:var(--y);color:var(--negro)}
+.ri-obs{background:var(--g-cla);color:var(--gris)}
+.rpt-accion{font-size:13px;font-weight:600;color:var(--g-osc);margin-bottom:.35rem}
+.rpt-item-obs{font-size:13px;color:var(--g-osc);background:var(--y-l);border-left:3px solid var(--y-d);border-radius:0 var(--r) var(--r) 0;padding:.4rem .75rem;line-height:1.4}
+.rpt-firma{display:grid;grid-template-columns:1fr 1fr;gap:1rem;padding:1.25rem;border-top:2px solid var(--negro)}
+@media(min-width:600px){.rpt-firma{grid-template-columns:repeat(3,1fr)}}
+.firma-campo{margin-top:1.5rem;border-top:1px solid var(--negro);padding-top:.3rem;font-size:11px;color:var(--gris);text-align:center}
+
+.io-section{background:var(--blanco);border-radius:var(--r-lg);padding:1.1rem 1.25rem;box-shadow:var(--sh);margin-bottom:.85rem}
+.io-section h3{font-size:13px;font-weight:600;margin-bottom:.65rem;color:var(--gris);text-transform:uppercase;letter-spacing:.05em}
+.io-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.io-info{font-size:13px;color:var(--gris);margin-top:.45rem;line-height:1.4}
+
+@media print{
+  body{background:white;padding:0;font-size:11px}
+  .header,.nav,.filtros,.form-actions,.mcard-actions,.modal-bg,.no-print,.rec-prog,.loading-overlay{display:none!important}
+  body{padding:0!important}
+  .view{display:none!important}
+  #view-reporte{display:block!important;padding:.5cm}
+  .rpt-wrap{box-shadow:none;border:1px solid #ddd;margin-bottom:.3cm}
+  .rpt-item{page-break-inside:avoid}
+  .rpt-print-hd{display:block!important}
+  .rpt-print-para{display:block!important}
+}
+.rpt-print-hd{display:none;border-bottom:2px solid var(--negro);margin-bottom:.4cm;padding-bottom:.25cm}
+.rpt-print-hd h1{font-size:16px;font-weight:700}
+.rpt-print-hd p{font-size:10px;color:#555;margin-top:3px}
+.rpt-print-para{display:none;font-size:11px;line-height:1.55;margin-bottom:.35cm;color:#333}
+
+.section-title{font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.65rem}
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--gris)}
+.empty .ei{font-size:44px;margin-bottom:.5rem}
+.divider{height:1px;background:var(--g-cla);margin:.85rem 0}
+.toast{position:fixed;bottom:calc(1.5rem + env(safe-area-inset-bottom,0));left:50%;transform:translateX(-50%);
+  background:var(--negro);color:var(--blanco);font-size:14px;padding:.75rem 1.25rem;border-radius:var(--r);
+  z-index:999;opacity:0;pointer-events:none;transition:opacity .2s;white-space:nowrap;box-shadow:var(--sh-lg)}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-txt">Cargando datos…</div>
+</div>
+
+<header class="header">
+  <div class="header-logo">CoopMorteros</div>
+  <div class="header-sep"></div>
+  <span class="header-title">Matafuegos</span>
+  <div class="header-right">
+    <span class="header-badge hb-ok" id="hbadge">✓ OK</span>
+    <span class="header-ver">v3</span>
+  </div>
+</header>
+
+<nav class="nav">
+  <button class="nav-btn active" id="nb-panel"    onclick="showView('panel')">   <span class="ni">📊</span>Panel</button>
+  <button class="nav-btn"        id="nb-listado"  onclick="showView('listado')"> <span class="ni">🧯</span>Listado</button>
+  <button class="nav-btn"        id="nb-nuevo"    onclick="showView('nuevo')">   <span class="ni">➕</span>Nuevo</button>
+  <button class="nav-btn"        id="nb-recorrida"onclick="showView('recorrida')"><span class="ni">📋</span>Recorrida</button>
+  <button class="nav-btn"        id="nb-reporte"  onclick="showView('reporte')"> <span class="ni">📨</span>Reporte</button>
+  <button class="nav-btn"        id="nb-datos"    onclick="showView('datos')">   <span class="ni">⚙️</span>Datos</button>
+</nav>
+
+<!-- PANEL -->
+<div class="view active" id="view-panel">
+  <div class="metrics" id="metrics"></div>
+  <div class="card"><div class="card-title"><span>🔴</span>Vencidos — acción inmediata</div><div id="alertas-venc"></div></div>
+  <div class="card"><div class="card-title"><span>🟣</span>Recipiente a renovar (≥20 años)</div><div id="alertas-recip"></div></div>
+  <div class="card"><div class="card-title"><span>🟡</span>Próximos a vencer (≤30 días)</div><div id="alertas-prox"></div></div>
+  <div class="card"><div class="card-title"><span>⚠️</span>Otras observaciones</div><div id="alertas-obs"></div></div>
+</div>
+
+<!-- LISTADO -->
+<div class="view" id="view-listado">
+  <div class="filtros">
+    <div class="fg"><label>Buscar</label><input type="text" id="f-buscar" placeholder="Sector, N°, tipo..." oninput="renderListado()"></div>
+    <div class="fg"><label>Sector</label><select id="f-sector" onchange="renderListado()"><option value="">Todos</option></select></div>
+    <div class="fg"><label>Estado</label>
+      <select id="f-estado" onchange="renderListado()">
+        <option value="">Todos</option><option value="vencido">Vencidos</option>
+        <option value="proximo">Próximos</option><option value="vigente">Vigentes</option>
+        <option value="recipiente">Recipiente a renovar</option>
+      </select>
+    </div>
+    <div class="fg"><label>Tipo</label><select id="f-tipo-l" onchange="renderListado()"><option value="">Todos</option></select></div>
+  </div>
+  <div class="tbl-wrap">
+    <div class="tbl-header"><h3>Matafuegos</h3><span class="tbl-count" id="lcount">0</span></div>
+    <div class="mcards" id="mcards"></div>
+    <div class="tbl-scroll">
+      <table class="dtbl">
+        <thead><tr><th>N° Int.</th><th>N° Extintor</th><th>Sector</th><th>Tipo</th><th>Kg</th><th>Fabricación</th><th>Venc. PH</th><th>Próx. Carga</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="dtbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="l-empty" style="display:none"><div class="ei">🔍</div><p>Sin resultados</p></div>
+  </div>
+</div>
+
+<!-- NUEVO/EDITAR -->
+<div class="view" id="view-nuevo">
+  <div class="form-card">
+    <h2 id="form-title">🧯 Registrar matafuego</h2>
+    <form id="el-form" onsubmit="submitForm(event)" novalidate>
+      <div class="form-grid">
+        <div class="fg-form full form-section"><div class="form-section-title"><span>🏷️</span>Identificación</div></div>
+        <div class="fg-form">
+          <label>Sector / Ubicación <span class="req">*</span></label>
+          <input type="text" id="fi-sector" list="dl-sectores" placeholder="Ej: Taller, Almacén...">
+          <datalist id="dl-sectores"></datalist><span class="err-msg">Campo obligatorio</span>
+        </div>
+        <div class="fg-form">
+          <label>N° Identificación interno <span class="req">*</span></label>
+          <input type="text" id="fi-id" placeholder="Ej: MAT-017"><span class="err-msg">Campo obligatorio</span>
+        </div>
+        <div class="fg-form full">
+          <label>N° Extintor / Estampado empresa</label>
+          <input type="text" id="fi-ext" placeholder="Ej: 1307682" style="font-family:var(--mono);letter-spacing:.05em">
+          <span class="hint">Número estampado en el cuerpo del extintor</span>
+        </div>
+        <div class="fg-form full form-section"><div class="form-section-title"><span>🔧</span>Características</div></div>
+        <div class="fg-form">
+          <label>Tipo <span class="req">*</span></label>
+          <select id="fi-tipo"><option value="">Seleccionar...</option></select><span class="err-msg">Seleccioná un tipo</span>
+        </div>
+        <div class="fg-form">
+          <label>Capacidad (kg) <span class="req">*</span></label>
+          <input type="number" id="fi-kg" placeholder="Ej: 5" min="0.5" step="0.5"><span class="err-msg">Ingresá la capacidad</span>
+        </div>
+        <div class="fg-form">
+          <label>Año de fabricación</label>
+          <input type="number" id="fi-anio" placeholder="Ej: 2018" min="1980" max="2035" oninput="actualizarHintAnio()">
+          <span class="hint" id="hint-anio">El recipiente debe reemplazarse a los 20 años</span>
+          <span class="err-msg">Año inválido</span>
+        </div>
+        <div class="fg-form full form-section"><div class="form-section-title"><span>📅</span>Fechas de control</div></div>
+        <div class="fg-form">
+          <label>Vencimiento PH <span class="req">*</span></label>
+          <input type="date" id="fi-vph"><span class="err-msg">Fecha de PH obligatoria</span>
+        </div>
+        <div class="fg-form">
+          <label>Próxima recarga <span class="req">*</span></label>
+          <input type="date" id="fi-carga"><span class="err-msg">Fecha de recarga obligatoria</span>
+        </div>
+        <div class="fg-form full form-section"><div class="form-section-title"><span>🔍</span>Estado físico</div></div>
+        <div class="fg-form full">
+          <label>Estado general</label>
+          <div class="radio-row">
+            <label class="rl"><input type="radio" name="r-estado" value="Bueno" checked>✅ Bueno</label>
+            <label class="rl"><input type="radio" name="r-estado" value="Regular">⚠️ Regular</label>
+            <label class="rl"><input type="radio" name="r-estado" value="Malo">🔴 Malo</label>
+          </div>
+        </div>
+        <div class="fg-form">
+          <label>¿Está señalizado?</label>
+          <div class="radio-row">
+            <label class="rl"><input type="radio" name="r-senial" value="Sí" checked>✅ Sí</label>
+            <label class="rl"><input type="radio" name="r-senial" value="No">✗ No</label>
+          </div>
+        </div>
+        <div class="fg-form">
+          <label>¿Está colgado / en soporte?</label>
+          <div class="radio-row">
+            <label class="rl"><input type="radio" name="r-colgado" value="Sí" checked>✅ Sí</label>
+            <label class="rl"><input type="radio" name="r-colgado" value="No">✗ No</label>
+          </div>
+        </div>
+        <div class="fg-form">
+          <label>¿Es accesible?</label>
+          <div class="radio-row">
+            <label class="rl"><input type="radio" name="r-access" value="Sí" checked>✅ Sí</label>
+            <label class="rl"><input type="radio" name="r-access" value="No">✗ No</label>
+          </div>
+        </div>
+        <div class="fg-form">
+          <label>¿Corresponde al riesgo?</label>
+          <div class="radio-row">
+            <label class="rl"><input type="radio" name="r-corresp" value="Sí" checked>✓ Sí</label>
+            <label class="rl"><input type="radio" name="r-corresp" value="No">✗ No</label>
+            <label class="rl"><input type="radio" name="r-corresp" value="A revisar">⚡ Revisar</label>
+          </div>
+        </div>
+        <div class="fg-form full">
+          <label>Observaciones</label>
+          <textarea id="fi-obs" placeholder="Estado del precinto, presión, soporte, notas..."></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" id="btn-guardar">💾 Guardar</button>
+        <button type="button" class="btn btn-ghost" onclick="cancelarForm()">Cancelar</button>
+      </div>
+      <div class="form-msg" id="form-msg"></div>
+    </form>
+  </div>
+</div>
+
+<!-- RECORRIDA -->
+<div class="view" id="view-recorrida">
+  <div class="rec-prog card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:.5rem">
+      <div><p style="font-size:14px;font-weight:600">Recorrida de control</p>
+        <p style="font-size:12px;color:var(--gris)" id="rec-fecha-txt"></p></div>
+      <button class="btn btn-sm btn-dark" onclick="finalizarRecorrida()">✅ Finalizar ↗</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gris);margin-bottom:3px">
+      <span>Revisados</span><span id="rec-prog-txt">0 / 0</span></div>
+    <div class="prog-bar-wrap"><div class="prog-bar-fill" id="rec-prog-bar" style="width:0%"></div></div>
+  </div>
+  <div class="filtros">
+    <div class="fg"><label>Sector</label><select id="rf-sector" onchange="renderRecorrida()"><option value="">Todos</option></select></div>
+    <div class="fg"><label>Solo</label>
+      <select id="rf-estado" onchange="renderRecorrida()">
+        <option value="">Todos</option><option value="vencido">Vencidos</option>
+        <option value="proximo">Próximos</option><option value="pendiente">Sin revisar</option>
+      </select>
+    </div>
+  </div>
+  <div id="rec-list"></div>
+</div>
+
+<!-- REPORTE -->
+<div class="view" id="view-reporte">
+  <div class="filtros no-print">
+    <div class="fg"><label>Incluir</label>
+      <select id="rpt-filtro" onchange="renderReporte()">
+        <option value="todos">Todos los problemas</option>
+        <option value="vencido">Solo vencidos</option>
+        <option value="fisico">Solo estado físico</option>
+        <option value="recipiente">Solo recipiente a renovar</option>
+      </select>
+    </div>
+    <div class="fg"><label>Sector</label><select id="rpt-sector" onchange="renderReporte()"><option value="">Todos</option></select></div>
+    <div class="fg" style="flex-direction:row;align-items:flex-end;gap:.4rem;min-width:auto">
+      <button class="btn btn-dark btn-sm" onclick="imprimirReporte()">🖨️ Imprimir / PDF</button>
+    </div>
+  </div>
+  <div id="rpt-body"></div>
+</div>
+
+<!-- DATOS -->
+<div class="view" id="view-datos">
+  <div class="io-section">
+    <h3>📤 Exportar datos</h3>
+    <div class="io-row">
+      <button class="btn btn-ghost btn-sm" onclick="exportarJSON()">⬇️ Exportar JSON</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarCSV()">⬇️ Exportar CSV</button>
+    </div>
+    <p class="io-info">Guardá el JSON como respaldo completo con historial.</p>
+  </div>
+  <div class="io-section">
+    <h3>📥 Importar datos</h3>
+    <div class="io-row">
+      <label class="btn btn-ghost btn-sm" style="cursor:pointer">⬆️ Importar JSON
+        <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importarJSON(event)">
+      </label>
+    </div>
+    <p class="io-info" style="color:var(--naranja)">⚠️ Reemplaza todos los datos actuales. Exportá primero.</p>
+  </div>
+  <div class="io-section">
+    <h3>🗑️ Gestión</h3>
+    <div class="io-row"><button class="btn btn-danger btn-sm" onclick="borrarTodo()">🗑️ Borrar todo</button></div>
+  </div>
+  <div class="io-section">
+    <h3>ℹ️ Versión</h3>
+    <p class="io-info"><strong>CoopMorteros — Control de Matafuegos v3</strong><br>
+      H&S · Resolución SRT 905/2015 · Ley 19.587<br>
+      <span id="info-registros"></span></p>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal-bg" onclick="bgClick(event)">
+  <div class="modal">
+    <span class="modal-drag"></span>
+    <div class="modal-hd"><h3 id="modal-tit">Detalle</h3><button class="modal-close" onclick="cerrarModal()">×</button></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-ft" id="modal-ft"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CAT = {
+  tipos:['ABC','PQS','CO2','HCFC','HALON','Agua','Espuma','Otro'],
+  sectores:[
+    'Almacén','Almacén entrada','Almacén altillo','Almacén final',
+    'Taller','Taller altillo','Herrería',
+    'Estacionamiento - Guardia','Estacionamiento - Redes','Estacionamiento - Telecomunicaciones',
+    'Guardia','Hall de Ingreso','Pasillo Técnica','Pasillo Cajas/Adm','Pasillo CAC/Adm',
+    'CAC','Banco de Sangre - Sala de Espera','Banco de Sangre - Sala Extracción',
+    'Consejo','Auditorio','Cocina Consejo','Archivo',
+    'Centro Distribución Secundario','Desayunador','Sala de Capacitaciones RRHH',
+    'IT&Development','IT&Development - Sala Reuniones','IT&Development - Laboratorio',
+    'Sepelio','Sepelio - Sala Roja','Sepelio - Sala Azul','Sepelio - Sala Verde',
+    'Sepelio - Estacionamiento','Sala Emergencia','Ósmosis','Sala de Cloro',
+    'Excelencia Operacional','Nodo Telecomunicaciones',
+  ],
+  accionesRec:[
+    {id:'ok',     label:'✅ Revisado OK',       cls:'sel-ok',  obs:''},
+    {id:'recarga',label:'🔄 Requiere recarga',  cls:'sel-warn',obs:'Requiere recarga.'},
+    {id:'ph',     label:'📅 PH vencido',         cls:'sel-mal', obs:'PH vencido. Gestionar renovación.'},
+    {id:'acceso', label:'🚫 No accesible',        cls:'sel-mal', obs:'No accesible. Despejar área.'},
+    {id:'senial', label:'⚠️ Sin señalización',  cls:'sel-warn',obs:'Sin cartel de señalización.'},
+    {id:'colgado',label:'📌 No está colgado',     cls:'sel-warn',obs:'Sin soporte reglamentario.'},
+    {id:'estado', label:'🔴 Mal estado',          cls:'sel-mal', obs:'Estado físico deficiente.'},
+  ]
+};
+const ANIO_LIMITE = 20;
+
+// ── SUPABASE CONFIG ──────────────────────────────────────────
+const SB_URL = 'https://feflvothkarqpjldyzlv.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlZmx2b3Roa2FycXBqbGR5emx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MTk3NDgsImV4cCI6MjA5NTI5NTc0OH0.NJOWBKpL45iRHwIfaHVbENQxcPK4B1greEkhiC_0LuY';
+const SB_HDR = { 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+SB_KEY };
+
+async function sbGet(table, filter=''){
+  const r = await fetch(SB_URL+'/rest/v1/'+table+'?'+filter+'&order=creado_en.asc', {headers:{...SB_HDR,'Prefer':'return=representation'}});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPost(table, body){
+  const r = await fetch(SB_URL+'/rest/v1/'+table, {method:'POST', headers:{...SB_HDR,'Prefer':'return=representation'}, body:JSON.stringify(body)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPatch(table, id, body){
+  const r = await fetch(SB_URL+'/rest/v1/'+table+'?id=eq.'+id, {method:'PATCH', headers:{...SB_HDR,'Prefer':'return=representation'}, body:JSON.stringify(body)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbDelete(table, id){
+  const r = await fetch(SB_URL+'/rest/v1/'+table+'?id=eq.'+id, {method:'DELETE', headers:SB_HDR});
+  if(!r.ok) throw new Error(await r.text());
+}
+async function sbUpsert(table, body){
+  const r = await fetch(SB_URL+'/rest/v1/'+table, {method:'POST', headers:{...SB_HDR,'Prefer':'resolution=merge-duplicates,return=representation'}, body:JSON.stringify(body)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// Mapeo DB ↔ app
+function rowToMat(r){
+  return {id:r.id, sector:r.sector, idInterno:r.id_interno, idExtintor:r.id_extintor,
+    tipo:r.tipo, kg:r.kg, anio:r.anio?String(r.anio):'', vph:r.vph||'', carga:r.carga||'',
+    estadoGeneral:r.estado_general, senializado:r.senializado, colgado:r.colgado,
+    accesible:r.accesible, corresponde:r.corresponde, obs:r.obs||'',
+    creadoEn:r.creado_en, updatedAt:r.updated_at};
+}
+function matToRow(m){
+  return {id:m.id, sector:m.sector, id_interno:m.idInterno, id_extintor:m.idExtintor||null,
+    tipo:m.tipo, kg:m.kg||null, anio:m.anio?parseInt(m.anio):null,
+    vph:m.vph||null, carga:m.carga||null, estado_general:m.estadoGeneral||null,
+    senializado:m.senializado||null, colgado:m.colgado||null, accesible:m.accesible||null,
+    corresponde:m.corresponde||null, obs:m.obs||null};
+}
+
+const DB = {
+  _d:null, _h:{}, _r:{},
+
+  async init(){
+    try{
+      const rows = await sbGet('mf_matafuegos');
+      this._d = rows.map(rowToMat);
+      // historial
+      const hist = await fetch(SB_URL+'/rest/v1/mf_historial?order=fecha.desc', {headers:SB_HDR});
+      const hrows = await hist.json();
+      this._h = {};
+      (hrows||[]).forEach(h=>{
+        if(!this._h[h.matafuego_id]) this._h[h.matafuego_id]=[];
+        this._h[h.matafuego_id].push({fecha:h.fecha, tipo:h.tipo, obs:h.obs, extra:h.extra||{}});
+      });
+      // recorrida
+      const rec = await sbGet('mf_recorrida','id=eq.session');
+      this._r = rec.length ? (rec[0].datos||{}) : {};
+    }catch(e){
+      console.error('Error init DB:',e);
+      this._d=this._d||[]; this._h={}; this._r={};
+    }
+  },
+
+  todos(){ return this._d||[]; },
+  porId(id){ return (this._d||[]).find(x=>x.id===id)||null; },
+
+  async guardar(m){
+    const row = await sbPost('mf_matafuegos', matToRow(m));
+    const mat = rowToMat(row[0]);
+    this._d.push(mat); return mat;
+  },
+
+  async editar(id, c){
+    const m = {...(this.porId(id)||{}), ...c, updatedAt:new Date().toISOString()};
+    const row = await sbPatch('mf_matafuegos', id, matToRow(m));
+    const idx = this._d.findIndex(x=>x.id===id);
+    const updated = rowToMat(row[0]);
+    if(idx>=0) this._d[idx]=updated;
+    return updated;
+  },
+
+  async borrar(id){
+    await sbDelete('mf_matafuegos', id);
+    this._d = this._d.filter(x=>x.id!==id);
+    delete this._h[id];
+  },
+
+  histDe(id){ return this._h[id]||[]; },
+
+  async histAgregar(id, tipo, obs, extra){
+    await sbPost('mf_historial', {matafuego_id:id, tipo, obs:obs||'', extra:extra||{}});
+    if(!this._h[id]) this._h[id]=[];
+    this._h[id].unshift({fecha:new Date().toISOString(), tipo, obs:obs||'', extra:extra||{}});
+  },
+
+  async histBorrar(id){
+    await fetch(SB_URL+'/rest/v1/mf_historial?matafuego_id=eq.'+id, {method:'DELETE', headers:SB_HDR});
+    delete this._h[id];
+  },
+
+  recDatos(){ return this._r||{}; },
+
+  async recGuardar(d){
+    this._r = d;
+    await sbUpsert('mf_recorrida', {id:'session', datos:d, updated_at:new Date().toISOString()});
+  },
+
+  exportar(){
+    return {version:3, exportadoEn:new Date().toISOString(), organizacion:'CoopMorteros',
+      matafuegos:this.todos(), historial:this._h};
+  },
+
+  async importar(obj){
+    if(!obj||!Array.isArray(obj.matafuegos)) throw new Error('Formato inválido');
+    // Borrar todo y reinsertar
+    await fetch(SB_URL+'/rest/v1/mf_matafuegos', {method:'DELETE', headers:{...SB_HDR,'Prefer':'return=minimal'}});
+    for(const m of obj.matafuegos){
+      await sbPost('mf_matafuegos', matToRow(m));
+    }
+    this._d = obj.matafuegos; this._h = obj.historial||{};
+  },
+
+  async borrarTodo(){
+    await fetch(SB_URL+'/rest/v1/mf_matafuegos?id=neq.NONE', {method:'DELETE', headers:{...SB_HDR,'Prefer':'return=minimal'}});
+    await fetch(SB_URL+'/rest/v1/mf_recorrida?id=neq.NONE', {method:'DELETE', headers:{...SB_HDR,'Prefer':'return=minimal'}});
+    this._d=[]; this._h={}; this._r={};
+  }
+};
+
+function hoy0(){const d=new Date();d.setHours(0,0,0,0);return d;}
+function diasHasta(s){if(!s)return null;const d=new Date(s);d.setHours(0,0,0,0);return Math.round((d-hoy0())/86400000);}
+function getEstado(m){const dp=diasHasta(m.vph),dc=diasHasta(m.carga);if((dp!==null&&dp<0)||(dc!==null&&dc<0))return'vencido';if((dp!==null&&dp<=30)||(dc!==null&&dc<=30))return'proximo';return'vigente';}
+function edadRecipiente(m){if(!m.anio)return null;return new Date().getFullYear()-parseInt(m.anio);}
+function necesitaRenovar(m){const e=edadRecipiente(m);return e!==null&&e>=ANIO_LIMITE;}
+function fmtF(s){if(!s)return'—';const[y,mo,d]=s.split('-');return`${d}/${mo}/${y}`;}
+function diasLabel(n){if(n===null)return'';if(n<0)return`<span class="dias-badge db-venc">${Math.abs(n)}d vencido</span>`;if(n===0)return`<span class="dias-badge db-venc">Hoy</span>`;if(n<=30)return`<span class="dias-badge db-prox">${n}d</span>`;return`<span class="dias-badge db-ok">${n}d</span>`;}
+function genId(){return'MAT-'+String(Date.now()).slice(-6);}
+function badgeEst(m){const e=getEstado(m),r=necesitaRenovar(m);let b=e==='vencido'?'<span class="badge bv">Vencido</span>':e==='proximo'?'<span class="badge bp">Próximo</span>':'<span class="badge bg-ok">Vigente</span>';if(r)b+=' <span class="badge b-viol">Recipiente</span>';return b;}
+function extChip(m){return m.idExtintor?`<span class="ext-chip">🔢 ${m.idExtintor}</span>`:'<span class="ext-chip sin">Sin N°</span>';}
+function anioChip(m){if(!m.anio)return'<span class="anio-chip" style="background:var(--g-cla);color:var(--gris)">Sin año fab.</span>';const e=edadRecipiente(m);if(e>=ANIO_LIMITE)return`<span class="anio-chip anio-venc">⚠️ Fab.${m.anio} · ${e}a</span>`;if(e>=ANIO_LIMITE-2)return`<span class="anio-chip anio-warn">Fab.${m.anio} · ${e}a</span>`;return`<span class="anio-chip anio-ok">Fab.${m.anio} · ${e}a</span>`;}
+function tagSN(v){return v==='Sí'?'<span class="tag t-si">✓ Sí</span>':v==='No'?'<span class="tag t-no">✗ No</span>':v?`<span class="tag t-rev">⚡${v}</span>`:'—';}
+
+function actualizarHintAnio(){
+  const v=document.getElementById('fi-anio').value,h=document.getElementById('hint-anio');
+  if(!v){h.textContent='El recipiente debe reemplazarse a los 20 años';h.className='hint';return;}
+  const e=new Date().getFullYear()-parseInt(v);
+  if(e>=ANIO_LIMITE){h.textContent=`⚠️ ${e} años — requiere renovación del cuerpo`;h.className='hint hint-viol';}
+  else if(e>=ANIO_LIMITE-2){h.textContent=`Atención: ${e} años — cerca del límite de 20`;h.className='hint hint-warn';}
+  else{h.textContent=`${e} año${e!==1?'s':''} de antigüedad — OK`;h.className='hint';}
+}
+
+function validarForm(){
+  let ok=true;
+  const campos={'fi-sector':v=>v.trim()!=='','fi-id':v=>v.trim()!=='','fi-tipo':v=>v!=='','fi-kg':v=>v!==''&&parseFloat(v)>0,'fi-vph':v=>v!=='','fi-carga':v=>v!==''};
+  for(const[id,fn]of Object.entries(campos)){const el=document.getElementById(id),fg=el.closest('.fg-form'),valid=fn(el.value);el.classList.toggle('err',!valid);fg.classList.toggle('has-err',!valid);if(!valid)ok=false;}
+  if(!ok)return{ok:false,msg:'Completá todos los campos obligatorios (*).'};
+  const ae=document.getElementById('fi-anio');
+  if(ae.value){const a=parseInt(ae.value);if(a<1980||a>new Date().getFullYear()){ae.classList.add('err');return{ok:false,msg:`Año inválido (${a}).`};}}
+  const carga=document.getElementById('fi-carga').value;
+  if(carga&&diasHasta(carga)<-365)return{ok:true,warn:`Fecha de recarga muy vencida (${fmtF(carga)}). Verificá.`};
+  const id=document.getElementById('fi-id').value.trim(),editId=document.getElementById('el-form').dataset.editId;
+  const dup=DB.todos().find(m=>m.idInterno===id&&m.id!==editId);
+  if(dup)return{ok:false,msg:`N° interno "${id}" ya existe (${dup.sector}).`};
+  return{ok:true};
+}
+
+async function submitForm(e){
+  e.preventDefault();
+  const v=validarForm();if(!v.ok){showMsg(v.msg,'err');return;}
+  const getR=n=>document.querySelector(`input[name="${n}"]:checked`)?.value||'';
+  const editId=document.getElementById('el-form').dataset.editId;
+  const datos={
+    sector:document.getElementById('fi-sector').value.trim(),
+    idInterno:document.getElementById('fi-id').value.trim(),
+    idExtintor:document.getElementById('fi-ext').value.trim(),
+    tipo:document.getElementById('fi-tipo').value,
+    kg:parseFloat(document.getElementById('fi-kg').value)||'',
+    anio:document.getElementById('fi-anio').value,
+    vph:document.getElementById('fi-vph').value,
+    carga:document.getElementById('fi-carga').value,
+    estadoGeneral:getR('r-estado'),senializado:getR('r-senial'),
+    colgado:getR('r-colgado'),accesible:getR('r-access'),corresponde:getR('r-corresp'),
+    obs:document.getElementById('fi-obs').value.trim(),
+  };
+  if(editId){await DB.editar(editId,datos);await DB.histAgregar(editId,'edicion',`Editado. ${datos.obs||''}`);toast('✅ Actualizado');}
+  else{const m={id:genId(),...datos,creadoEn:new Date().toISOString(),updatedAt:new Date().toISOString()};await DB.guardar(m);await DB.histAgregar(m.id,'alta','Registro inicial.');toast('✅ Registrado');}
+  if(v.warn)showMsg(v.warn,'warn');
+  resetForm();actualizarCatalogos();showView('listado');
+}
+
+function resetForm(){
+  document.getElementById('el-form').reset();
+  document.getElementById('el-form').dataset.editId='';
+  document.getElementById('form-title').textContent='🧯 Registrar matafuego';
+  document.getElementById('btn-guardar').textContent='💾 Guardar';
+  document.querySelectorAll('.fg-form').forEach(f=>f.classList.remove('has-err'));
+  document.querySelectorAll('.fg-form input,.fg-form select').forEach(el=>el.classList.remove('err'));
+  document.getElementById('hint-anio').textContent='El recipiente debe reemplazarse a los 20 años';
+  document.getElementById('hint-anio').className='hint';
+  hideMsg();
+}
+function cancelarForm(){resetForm();showView('listado');}
+
+function editarMat(id){
+  const m=DB.porId(id);if(!m)return;cerrarModal();
+  document.getElementById('el-form').dataset.editId=id;
+  document.getElementById('fi-sector').value=m.sector||'';
+  document.getElementById('fi-id').value=m.idInterno||'';
+  document.getElementById('fi-ext').value=m.idExtintor||'';
+  document.getElementById('fi-tipo').value=m.tipo||'';
+  document.getElementById('fi-kg').value=m.kg||'';
+  document.getElementById('fi-anio').value=m.anio||'';
+  document.getElementById('fi-vph').value=m.vph||'';
+  document.getElementById('fi-carga').value=m.carga||'';
+  document.getElementById('fi-obs').value=m.obs||'';
+  document.getElementById('form-title').textContent='✏️ Editar matafuego';
+  document.getElementById('btn-guardar').textContent='💾 Actualizar';
+  const setR=(n,v)=>{const el=document.querySelector(`input[name="${n}"][value="${v}"]`);if(el)el.checked=true;};
+  setR('r-estado',m.estadoGeneral);setR('r-senial',m.senializado);
+  setR('r-colgado',m.colgado||'Sí');setR('r-access',m.accesible);setR('r-corresp',m.corresponde);
+  actualizarHintAnio();showView('nuevo');
+}
+
+async function eliminarMat(id){
+  const m=DB.porId(id);if(!m)return;
+  if(!confirm(`¿Eliminar "${m.idInterno} — ${m.sector}"?\nEsta acción no se puede deshacer.`))return;
+  await DB.borrar(id);cerrarModal();toast('🗑️ Eliminado');actualizarCatalogos();renderListado();renderPanel();
+}
+
+function renderPanel(){
+  const todos=DB.todos();
+  const venc=todos.filter(m=>getEstado(m)==='vencido');
+  const prox=todos.filter(m=>getEstado(m)==='proximo');
+  const vig=todos.filter(m=>getEstado(m)==='vigente');
+  const recip=todos.filter(m=>necesitaRenovar(m));
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric m-azul"><div class="metric-num">${todos.length}</div><div class="metric-lbl">Total registrados</div></div>
+    <div class="metric m-rojo"><div class="metric-num">${venc.length}</div><div class="metric-lbl">Vencidos</div></div>
+    <div class="metric m-naranja"><div class="metric-num">${prox.length}</div><div class="metric-lbl">Próximos (≤30d)</div></div>
+    <div class="metric m-verde"><div class="metric-num">${vig.length}</div><div class="metric-lbl">Vigentes</div></div>
+    <div class="metric m-violeta"><div class="metric-num">${recip.length}</div><div class="metric-lbl">Recipiente a renovar</div></div>`;
+  const hb=document.getElementById('hbadge');
+  if(venc.length>0){hb.className='header-badge hb-critico';hb.textContent=`⛔ ${venc.length} vencido${venc.length>1?'s':''}`;}
+  else if(prox.length>0||recip.length>0){hb.className='header-badge hb-alerta';hb.textContent=`⚠️ ${prox.length+recip.length} atención`;}
+  else{hb.className='header-badge hb-ok';hb.textContent=todos.length>0?'✅ Todo OK':'—';}
+  const aH=(m,cls)=>{const dp=diasHasta(m.vph),dc=diasHasta(m.carga),f=[];
+    if(dp!==null&&dp<0)f.push(`PH vencido ${Math.abs(dp)}d`);else if(dp!==null&&dp<=30)f.push(`PH vence ${dp}d`);
+    if(dc!==null&&dc<0)f.push(`Carga vencida ${Math.abs(dc)}d`);else if(dc!==null&&dc<=30)f.push(`Carga vence ${dc}d`);
+    if(m.senializado==='No')f.push('Sin señal');if(m.accesible==='No')f.push('No accesible');if(m.colgado==='No')f.push('No colgado');
+    return`<div class="alerta ${cls}" onclick="verDetalle('${m.id}')"><div class="alerta-dot"></div><div class="alerta-txt"><p>#${m.idInterno} — ${m.sector}</p><small>${m.tipo} ${m.kg}kg · ${f.join(' · ')}</small></div></div>`;};
+  document.getElementById('alertas-venc').innerHTML=venc.length?venc.map(m=>aH(m,'a-rojo')).join(''):'<div class="empty-ok">✅ No hay vencidos</div>';
+  document.getElementById('alertas-recip').innerHTML=recip.length?recip.map(m=>`<div class="alerta a-violeta" onclick="verDetalle('${m.id}')"><div class="alerta-dot"></div><div class="alerta-txt"><p>#${m.idInterno} — ${m.sector}</p><small>${m.tipo} ${m.kg}kg · Fab.${m.anio} · ${edadRecipiente(m)} años</small></div></div>`).join(''):'<div class="empty-ok">✅ Sin recipientes con más de 20 años</div>';
+  document.getElementById('alertas-prox').innerHTML=prox.length?prox.map(m=>aH(m,'a-naranja')).join(''):'<div class="empty-ok">✅ Sin vencimientos próximos</div>';
+  const conObs=todos.filter(m=>m.obs&&getEstado(m)==='vigente'&&!necesitaRenovar(m));
+  document.getElementById('alertas-obs').innerHTML=conObs.length?conObs.map(m=>`<div class="alerta a-naranja" onclick="verDetalle('${m.id}')"><div class="alerta-dot"></div><div class="alerta-txt"><p>#${m.idInterno} — ${m.sector}</p><small>${m.obs.substring(0,80)}${m.obs.length>80?'...':''}</small></div></div>`).join(''):'<div class="empty-ok">✅ Sin observaciones activas</div>';
+}
+
+function renderListado(){
+  const q=(document.getElementById('f-buscar')?.value||'').toLowerCase();
+  const sec=document.getElementById('f-sector')?.value||'';
+  const est=document.getElementById('f-estado')?.value||'';
+  const tipo=document.getElementById('f-tipo-l')?.value||'';
+  let data=DB.todos().filter(m=>{
+    if(sec&&m.sector!==sec)return false;
+    if(est==='recipiente'&&!necesitaRenovar(m))return false;
+    if(est&&est!=='recipiente'&&getEstado(m)!==est)return false;
+    if(tipo&&m.tipo!==tipo)return false;
+    if(q&&!`${m.sector} ${m.idInterno} ${m.idExtintor} ${m.tipo} ${m.obs}`.toLowerCase().includes(q))return false;
+    return true;
+  });
+  document.getElementById('lcount').textContent=`${data.length} registro${data.length!==1?'s':''}`;
+  document.getElementById('l-empty').style.display=data.length?'none':'block';
+  const eFG=m=>{const items=[
+    {lbl:'Estado',val:m.estadoGeneral||'—',c:m.estadoGeneral==='Bueno'?'ei-ok':m.estadoGeneral==='Malo'?'ei-mal':'ei-warn'},
+    {lbl:'Señalizado',val:m.senializado||'—',c:m.senializado==='Sí'?'ei-ok':m.senializado==='No'?'ei-mal':'ei-na'},
+    {lbl:'Colgado',val:m.colgado||'—',c:m.colgado==='Sí'?'ei-ok':m.colgado==='No'?'ei-mal':'ei-na'},
+    {lbl:'Accesible',val:m.accesible||'—',c:m.accesible==='Sí'?'ei-ok':m.accesible==='No'?'ei-mal':'ei-na'},
+    {lbl:'Riesgo OK',val:m.corresponde||'—',c:m.corresponde==='Sí'?'ei-ok':m.corresponde==='No'?'ei-mal':'ei-warn'},
+  ];return items.map(i=>`<div class="estado-item ${i.c}"><div class="ei-lbl">${i.lbl}</div><div class="ei-val">${i.val}</div></div>`).join('');};
+  document.getElementById('mcards').innerHTML=data.map(m=>{
+    const e=getEstado(m),r=necesitaRenovar(m),cls=e==='vencido'?'ev':e==='proximo'?'ep':r?'erecip':'eg';
+    return`<div class="mcard ${cls}" id="mc-${m.id}">
+      <div class="mcard-head" onclick="toggleCard('${m.id}')">
+        <div class="mcard-left">
+          <div class="mcard-id">#${m.idInterno}</div>
+          <div class="mcard-sector">${m.sector}</div>
+          <div class="mcard-chips">${extChip(m)} ${anioChip(m)}</div>
+          <div class="mcard-info"><span>🔥 ${m.tipo} ${m.kg}kg</span><span>📅 PH: ${fmtF(m.vph)}</span><span>🔄 Carga: ${fmtF(m.carga)}</span></div>
+        </div><span class="mcard-chevron">⌄</span>
+      </div>
+      <div class="mcard-detail">
+        <div style="margin-bottom:.6rem;display:flex;flex-wrap:wrap;gap:5px">${badgeEst(m)}</div>
+        <div class="section-title">Estado físico</div>
+        <div class="estado-grid">${eFG(m)}</div>
+        ${m.obs?`<div class="obs-box"><strong>Observaciones</strong>${m.obs}</div>`:''}
+        <div class="mcard-actions">
+          <button class="btn btn-ghost btn-sm" onclick="verDetalle('${m.id}')">🔍 Ver</button>
+          <button class="btn btn-ghost btn-sm" onclick="editarMat('${m.id}')">✏️ Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarMat('${m.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('dtbody').innerHTML=data.map(m=>{
+    const e=getEstado(m),r=necesitaRenovar(m),cls=e==='vencido'?'ev':e==='proximo'?'ep':r?'erecip':'eg';
+    return`<tr class="${cls}"><td><strong style="font-family:var(--mono)">${m.idInterno}</strong></td>
+      <td>${extChip(m)}</td><td>${m.sector}</td><td>${m.tipo}</td><td>${m.kg||'—'}</td>
+      <td>${anioChip(m)}</td><td>${fmtF(m.vph)} ${diasLabel(diasHasta(m.vph))}</td>
+      <td>${fmtF(m.carga)} ${diasLabel(diasHasta(m.carga))}</td><td>${badgeEst(m)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="verDetalle('${m.id}')">🔍</button>
+        <button class="btn btn-ghost btn-sm" onclick="editarMat('${m.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarMat('${m.id}')">🗑️</button>
+      </td></tr>`;
+  }).join('');
+}
+
+function toggleCard(id){document.getElementById('mc-'+id)?.classList.toggle('expanded');}
+
+function verDetalle(id){
+  const m=DB.porId(id);if(!m)return;
+  const dp=diasHasta(m.vph),dc=diasHasta(m.carga),r=necesitaRenovar(m),e=edadRecipiente(m);
+  let bloques='';
+  if(r)bloques+=`<div class="di full viol-block"><div class="di-lbl">⚠️ Recipiente a renovar</div><div class="di-val">Fab.${m.anio} — ${e} años.</div></div>`;
+  if(m.senializado==='No')bloques+=`<div class="di full warn-block"><div class="di-lbl">⚠️ Sin señalización</div><div class="di-val">Colocar cartel indicador.</div></div>`;
+  if(m.colgado==='No')bloques+=`<div class="di full warn-block"><div class="di-lbl">📌 No está colgado</div><div class="di-val">Instalar soporte reglamentario.</div></div>`;
+  if(m.accesible==='No')bloques+=`<div class="di full err-block"><div class="di-lbl">🚫 No accesible</div><div class="di-val">Despejar acceso. Acción inmediata.</div></div>`;
+  if(m.corresponde&&m.corresponde!=='Sí')bloques+=`<div class="di full warn-block"><div class="di-lbl">⚡ Riesgo: ${m.corresponde}</div><div class="di-val">Verificar adecuación del tipo ${m.tipo}.</div></div>`;
+  const hist=DB.histDe(id);
+  const histH=hist.length?hist.slice(0,8).map(h=>`<div class="hist-item"><div class="hist-fecha">${new Date(h.fecha).toLocaleDateString('es-AR')}</div><div class="hist-body"><div class="hist-tipo">${tipoHL(h.tipo)}</div>${h.obs?`<div class="hist-obs">${h.obs}</div>`:''}</div></div>`).join(''):'<p style="font-size:12px;color:var(--gris)">Sin historial</p>';
+  document.getElementById('modal-tit').textContent=`#${m.idInterno} — ${m.sector}`;
+  document.getElementById('modal-body').innerHTML=`
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:.75rem">${badgeEst(m)}<span class="badge b-gray">${m.tipo}</span><span class="badge b-gray">${m.kg}kg</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.85rem">${extChip(m)} ${anioChip(m)}</div>
+    ${bloques}
+    <div class="dg">
+      <div class="di ${dp!==null&&dp<0?'err-block':dp!==null&&dp<=30?'warn-block':''}"><div class="di-lbl">Vencimiento PH</div><div class="di-val">${fmtF(m.vph)} ${diasLabel(dp)}</div></div>
+      <div class="di ${dc!==null&&dc<0?'err-block':dc!==null&&dc<=30?'warn-block':''}"><div class="di-lbl">Próxima carga</div><div class="di-val">${fmtF(m.carga)} ${diasLabel(dc)}</div></div>
+      <div class="di"><div class="di-lbl">Estado general</div><div class="di-val">${m.estadoGeneral||'—'}</div></div>
+      <div class="di"><div class="di-lbl">Señalizado</div><div class="di-val">${tagSN(m.senializado)}</div></div>
+      <div class="di"><div class="di-lbl">Colgado</div><div class="di-val">${tagSN(m.colgado)}</div></div>
+      <div class="di"><div class="di-lbl">Accesible</div><div class="di-val">${tagSN(m.accesible)}</div></div>
+      <div class="di full"><div class="di-lbl">Corresponde al riesgo</div><div class="di-val">${tagSN(m.corresponde)}</div></div>
+      ${m.obs?`<div class="di full warn-block"><div class="di-lbl">Observaciones</div><div class="di-val">${m.obs}</div></div>`:''}
+    </div>
+    <div class="divider"></div>
+    <div class="section-title">📋 Historial</div>
+    <div class="hist-list">${histH}</div>`;
+  document.getElementById('modal-ft').innerHTML=`
+    <button class="btn btn-primary btn-sm" onclick="editarMat('${id}')">✏️ Editar</button>
+    <button class="btn btn-danger btn-sm" onclick="eliminarMat('${id}')">🗑️</button>`;
+  abrirModal();
+}
+function tipoHL(t){return{alta:'🟢 Alta',edicion:'✏️ Edición',recorrida:'📋 Recorrida',recarga:'🔄 Recarga',ph:'📅 PH'}[t]||t;}
+
+function abrirModal(){document.getElementById('modal-bg').classList.add('open');}
+function cerrarModal(){document.getElementById('modal-bg').classList.remove('open');}
+function bgClick(e){if(e.target===document.getElementById('modal-bg'))cerrarModal();}
+
+let recSession={};
+function renderRecorrida(){
+  recSession=DB.recDatos();
+  const sec=document.getElementById('rf-sector')?.value||'';
+  const fe=document.getElementById('rf-estado')?.value||'';
+  let data=DB.todos().filter(m=>{
+    if(sec&&m.sector!==sec)return false;
+    if(fe==='vencido'&&getEstado(m)!=='vencido')return false;
+    if(fe==='proximo'&&getEstado(m)!=='proximo')return false;
+    if(fe==='pendiente'&&recSession[m.id])return false;
+    return true;
+  });
+  const total=DB.todos().length,rev=Object.keys(recSession).length,pct=total>0?Math.round(rev/total*100):0;
+  document.getElementById('rec-prog-txt').textContent=`${rev} / ${total}`;
+  document.getElementById('rec-prog-bar').style.width=pct+'%';
+  document.getElementById('rec-fecha-txt').textContent=`Hoy: ${new Date().toLocaleDateString('es-AR',{dateStyle:'full'})}`;
+  if(!data.length){document.getElementById('rec-list').innerHTML='<div class="empty"><div class="ei">✅</div><p>Sin matafuegos con este filtro</p></div>';return;}
+  document.getElementById('rec-list').innerHTML=data.map(m=>{
+    const e=getEstado(m),rcls=e==='vencido'?'rv':e==='proximo'?'rp':'rg';
+    const done=!!recSession[m.id],sd=recSession[m.id]||{};
+    const accs=CAT.accionesRec.map(a=>`<button class="rec-btn ${sd.accion===a.id?a.cls:''}" onclick="setAccionRec('${m.id}','${a.id}','${a.obs.replace(/'/g,"\\'")}',this)">${a.label}</button>`).join('');
+    return`<div class="rec-card ${rcls} ${done?'done':''}" id="rc-${m.id}">
+      <div class="rec-done-bar">✅ Revisado — ${sd.accion||''} ${sd.obs?'· '+sd.obs.substring(0,35):''}</div>
+      <div class="rec-header" onclick="toggleRec('${m.id}')">
+        <div class="rec-header-txt">
+          <div class="rec-id">#${m.idInterno} · ${m.tipo} ${m.kg}kg · Ext.${m.idExtintor||'?'}</div>
+          <div class="rec-sector">${m.sector}</div>
+          <div class="rec-sub">PH: ${fmtF(m.vph)} · Carga: ${fmtF(m.carga)}</div>
+          <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">${extChip(m)} ${anioChip(m)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">${badgeEst(m)}<span class="rec-chevron">⌄</span></div>
+      </div>
+      <div class="rec-body">
+        <div class="rec-acciones">${accs}</div>
+        <textarea class="rec-obs" id="robs-${m.id}" placeholder="Observación adicional..." onchange="setObsRec('${m.id}',this.value)">${sd.obs||''}</textarea>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+          <button class="btn btn-verde btn-sm" onclick="marcarRevisado('${m.id}')">✅ Confirmar</button>
+          <button class="btn btn-ghost btn-sm" onclick="editarMat('${m.id}')">✏️ Editar ficha</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleRec(id){document.getElementById('rc-'+id)?.classList.toggle('expanded');}
+async function setAccionRec(id,accion,obsAuto,btn){
+  const card=document.getElementById('rc-'+id);
+  card.querySelectorAll('.rec-btn').forEach(b=>b.classList.remove('sel-ok','sel-mal','sel-warn'));
+  const a=CAT.accionesRec.find(x=>x.id===accion);if(a)btn.classList.add(a.cls);
+  if(!recSession[id])recSession[id]={};recSession[id].accion=accion;
+  const oe=document.getElementById('robs-'+id);
+  if(obsAuto&&oe&&!oe.value){oe.value=obsAuto;recSession[id].obs=obsAuto;}
+  await DB.recGuardar(recSession);
+}
+async function setObsRec(id,val){if(!recSession[id])recSession[id]={};recSession[id].obs=val;await DB.recGuardar(recSession);}
+async function marcarRevisado(id){
+  if(!recSession[id])recSession[id]={};
+  if(!recSession[id].accion)recSession[id].accion='ok';
+  recSession[id].hora=new Date().toISOString();
+  await DB.recGuardar(recSession);
+  await DB.histAgregar(id,'recorrida',recSession[id].obs||recSession[id].accion,{accion:recSession[id].accion});
+  const a=CAT.accionesRec.find(x=>x.id===recSession[id].accion);
+  if(a&&a.id!=='ok'&&a.obs){const m=DB.porId(id);if(m)await DB.editar(id,{obs:recSession[id].obs||a.obs});}
+  const card=document.getElementById('rc-'+id);
+  if(card){card.classList.add('done');card.classList.remove('expanded');
+    const bar=card.querySelector('.rec-done-bar');
+    if(bar)bar.textContent=`✅ Revisado — ${recSession[id].accion} ${recSession[id].obs?'· '+recSession[id].obs.substring(0,35):''}`;}
+  renderRecorrida();toast('✅ Revisión registrada');
+}
+function finalizarRecorrida(){
+  const rev=Object.keys(recSession).length,total=DB.todos().length;
+  const prob=DB.todos().filter(m=>{const s=recSession[m.id];return s&&s.accion&&s.accion!=='ok';});
+  const res=prob.map(m=>{const s=recSession[m.id];return`#${m.idInterno} ${m.sector} (${s.accion}${s.obs?': '+s.obs:''})`;}).join('; ');
+  sendPrompt(`Finalicé la recorrida de matafuegos en CoopMorteros. Fecha: ${new Date().toLocaleDateString('es-AR')}. Revisados: ${rev} de ${total}. Problemas (${prob.length}): ${res||'ninguno'}. Generá: 1) Resumen ejecutivo, 2) Acciones correctivas por prioridad, 3) Texto formal para Mantenimiento.`);
+}
+
+function getProblemas(m){
+  const issues=[];const e=getEstado(m);
+  if(e==='vencido')issues.push({tipo:'venc',label:'Vencido',cls:'ri-venc',p:1});
+  if(e==='proximo')issues.push({tipo:'prox',label:'Vence ≤30 días',cls:'ri-prox',p:2});
+  if(necesitaRenovar(m))issues.push({tipo:'recip',label:`Recipiente ${edadRecipiente(m)}a`,cls:'ri-recip',p:2});
+  if(m.estadoGeneral==='Malo')issues.push({tipo:'fisico',label:'Mal estado',cls:'ri-fisico',p:2});
+  if(m.estadoGeneral==='Regular')issues.push({tipo:'fisico',label:'Estado regular',cls:'ri-fisico',p:3});
+  if(m.senializado==='No')issues.push({tipo:'fisico',label:'Sin señalización',cls:'ri-fisico',p:3});
+  if(m.colgado==='No')issues.push({tipo:'fisico',label:'No está colgado',cls:'ri-fisico',p:3});
+  if(m.accesible==='No')issues.push({tipo:'fisico',label:'No accesible',cls:'ri-fisico',p:1});
+  if(m.corresponde==='No')issues.push({tipo:'fisico',label:'Riesgo inadecuado',cls:'ri-fisico',p:2});
+  if(m.corresponde==='A revisar')issues.push({tipo:'fisico',label:'Riesgo a verificar',cls:'ri-fisico',p:3});
+  if(m.obs)issues.push({tipo:'obs',label:'Con observación',cls:'ri-obs',p:4});
+  return issues;
+}
+function prioMax(issues){return issues.length?Math.min(...issues.map(i=>i.p)):99;}
+function prioCls(p){return p===1?'p-critico':p===2?'p-alto':p===3?'p-medio':'p-bajo';}
+function prioLabel(p){return p===1?'🔴 Crítico':p===2?'🟠 Alto':p===3?'🟡 Medio':'⚪ Observaciones';}
+function acciones(m,issues){
+  const a=[];const dp=diasHasta(m.vph),dc=diasHasta(m.carga);
+  if(dp!==null&&dp<0)a.push(`Renovar PH (vencido ${Math.abs(dp)}d)`);
+  else if(dp!==null&&dp<=30)a.push(`Programar renovación PH (${dp}d restantes)`);
+  if(dc!==null&&dc<0)a.push(`Realizar recarga (vencida ${Math.abs(dc)}d)`);
+  else if(dc!==null&&dc<=30)a.push(`Programar recarga (${dc}d restantes)`);
+  if(necesitaRenovar(m))a.push(`Reemplazar recipiente (${edadRecipiente(m)} años)`);
+  if(m.estadoGeneral==='Malo')a.push('Evaluar reemplazo del equipo');
+  if(m.estadoGeneral==='Regular')a.push('Verificar condición del equipo');
+  if(m.senializado==='No')a.push('Colocar cartel de señalización');
+  if(m.colgado==='No')a.push('Instalar en soporte reglamentario');
+  if(m.accesible==='No')a.push('Despejar acceso al extintor');
+  if(m.corresponde==='No')a.push('Revisar adecuación al tipo de riesgo');
+  if(m.corresponde==='A revisar')a.push('Verificar correspondencia con riesgo del sector');
+  return a.length?a.join(' · '):'Verificar en campo';
+}
+
+function renderReporte(){
+  const filtro=document.getElementById('rpt-filtro')?.value||'todos';
+  const sector=document.getElementById('rpt-sector')?.value||'';
+  const hoy=new Date().toLocaleDateString('es-AR',{dateStyle:'long'});
+  let data=DB.todos().filter(m=>{
+    if(sector&&m.sector!==sector)return false;
+    const iss=getProblemas(m);if(!iss.length)return false;
+    if(filtro==='vencido')return iss.some(i=>i.tipo==='venc');
+    if(filtro==='fisico')return iss.some(i=>i.tipo==='fisico');
+    if(filtro==='recipiente')return iss.some(i=>i.tipo==='recip');
+    return true;
+  });
+  data.sort((a,b)=>{const pa=prioMax(getProblemas(a)),pb=prioMax(getProblemas(b));return pa!==pb?pa-pb:a.sector.localeCompare(b.sector);});
+  const grupos={};
+  data.forEach(m=>{const p=prioMax(getProblemas(m));if(!grupos[p])grupos[p]=[];grupos[p].push(m);});
+  const tv=data.filter(m=>getEstado(m)==='vencido').length;
+  const tf=data.filter(m=>getProblemas(m).some(i=>i.tipo==='fisico')).length;
+  const tr=data.filter(m=>necesitaRenovar(m)).length;
+  let html=`
+    <div class="rpt-print-hd">
+      <h1>📨 Reporte de Mantenimiento — Matafuegos</h1>
+      <p>CoopMorteros &nbsp;|&nbsp; Fecha: ${hoy} &nbsp;|&nbsp; Destinatario: Área de Mantenimiento</p>
+    </div>
+    <p class="rpt-print-para">Por medio del presente se informa al Área de Mantenimiento que, como resultado del control periódico de extintores realizado con fecha <strong>${hoy}</strong>, se detectaron <strong>${data.length} equipo${data.length!==1?'s':''}</strong> que requieren intervención.</p>`;
+  if(!data.length){html+='<div class="rpt-wrap"><div class="rpt-empty">✅ No hay equipos con problemas para este filtro</div></div>';document.getElementById('rpt-body').innerHTML=html;return;}
+  html+=`<div class="rpt-wrap no-print">
+    <div class="rpt-hd"><h3>📊 Resumen</h3><span class="rpt-count">${data.length} equipo${data.length!==1?'s':''} con problemas</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;padding:1rem 1.25rem">
+      <div style="background:var(--rojo-l);border-radius:var(--r);padding:.75rem 1rem;border-top:3px solid var(--rojo)"><div style="font-size:24px;font-weight:700;font-family:var(--mono);color:var(--rojo)">${tv}</div><div style="font-size:12px;color:var(--gris)">Vencidos</div></div>
+      <div style="background:var(--naranja-l);border-radius:var(--r);padding:.75rem 1rem;border-top:3px solid var(--naranja)"><div style="font-size:24px;font-weight:700;font-family:var(--mono);color:var(--naranja)">${tf}</div><div style="font-size:12px;color:var(--gris)">Problemas físicos</div></div>
+      <div style="background:var(--violeta-l);border-radius:var(--r);padding:.75rem 1rem;border-top:3px solid var(--violeta)"><div style="font-size:24px;font-weight:700;font-family:var(--mono);color:var(--violeta)">${tr}</div><div style="font-size:12px;color:var(--gris)">Recipiente a renovar</div></div>
+    </div></div>`;
+  [1,2,3,4].forEach(p=>{
+    if(!grupos[p])return;
+    html+=`<div class="rpt-wrap"><div class="rpt-hd"><h3>${prioLabel(p)}</h3><span class="rpt-count">${grupos[p].length} equipo${grupos[p].length!==1?'s':''}</span></div>
+      ${grupos[p].map(m=>{const iss=getProblemas(m);return`<div class="rpt-item">
+        <div class="rpt-priority ${prioCls(p)}"></div>
+        <div class="rpt-item-num">${m.idInterno}</div>
+        <div class="rpt-item-body">
+          <div class="rpt-item-top"><div class="rpt-item-sector">${m.sector}</div>
+          <div class="rpt-issues">${iss.map(i=>`<span class="rpt-issue ${i.cls}">${i.label}</span>`).join('')}</div></div>
+          <div class="rpt-item-meta">${extChip(m)} &nbsp;${m.tipo} ${m.kg}kg &nbsp;·&nbsp; ${anioChip(m)} &nbsp;·&nbsp; PH: ${fmtF(m.vph)} &nbsp;·&nbsp; Carga: ${fmtF(m.carga)}</div>
+          <div class="rpt-accion">🔧 ${acciones(m,iss)}</div>
+          ${m.obs?`<div class="rpt-item-obs">📝 ${m.obs}</div>`:''}
+        </div></div>`;}).join('')}
+    </div>`;
+  });
+  html+=`<div class="rpt-wrap"><div class="rpt-firma">
+    <div class="firma-campo">Responsable H&amp;S</div>
+    <div class="firma-campo">Responsable Mantenimiento</div>
+    <div class="firma-campo">Fecha de resolución</div>
+  </div></div>`;
+  document.getElementById('rpt-body').innerHTML=html;
+}
+
+function imprimirReporte(){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-reporte').classList.add('active');
+  setTimeout(()=>window.print(),150);
+}
+
+function exportarJSON(){
+  const blob=new Blob([JSON.stringify(DB.exportar(),null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=`matafuegos_coop_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);toast('📤 JSON exportado');
+}
+function exportarCSV(){
+  const cols=['idInterno','idExtintor','sector','tipo','kg','anio','vph','carga','estadoGeneral','senializado','colgado','accesible','corresponde','obs'];
+  const csv=[cols.join(','),...DB.todos().map(m=>cols.map(k=>`"${(m[k]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=`matafuegos_coop_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);toast('📤 CSV exportado');
+}
+async function importarJSON(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    try{const obj=JSON.parse(ev.target.result);
+      if(!confirm(`¿Importar ${obj.matafuegos?.length||0} matafuegos? Se reemplazarán los datos actuales.`))return;
+      await DB.importar(obj);actualizarCatalogos();renderPanel();renderListado();
+      toast(`✅ ${obj.matafuegos.length} matafuegos importados`);
+    }catch(err){toast('❌ Error al importar');}
+  };
+  reader.readAsText(file);e.target.value='';
+}
+async function borrarTodo(){
+  if(!confirm('¿Borrar TODOS los datos? Esta acción es irreversible.'))return;
+  await DB.borrarTodo();recSession={};actualizarCatalogos();renderPanel();renderListado();toast('🗑️ Datos borrados');
+}
+
+function actualizarCatalogos(){
+  const todos=DB.todos();
+  const sectores=[...new Set(todos.map(m=>m.sector))].sort();
+  ['f-sector','rf-sector','rpt-sector'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const cur=el.value;
+    el.innerHTML=`<option value="">Todos</option>`+sectores.map(s=>`<option ${s===cur?'selected':''}value="${s}">${s}</option>`).join('');
+  });
+  const tl=document.getElementById('f-tipo-l');
+  if(tl)tl.innerHTML=`<option value="">Todos</option>`+CAT.tipos.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const tf=document.getElementById('fi-tipo');
+  if(tf)tf.innerHTML=`<option value="">Seleccionar...</option>`+CAT.tipos.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const dl=document.getElementById('dl-sectores');
+  if(dl){const all=[...new Set([...CAT.sectores,...sectores])].sort();dl.innerHTML=all.map(s=>`<option value="${s}">`).join('');}
+  const ie=document.getElementById('info-registros');
+  if(ie)ie.textContent=`${todos.length} matafuego${todos.length!==1?'s':''} registrado${todos.length!==1?'s':''}`;
+}
+
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  const nb=document.getElementById('nb-'+name);if(nb)nb.classList.add('active');
+  if(name==='panel')renderPanel();
+  if(name==='listado'){actualizarCatalogos();renderListado();}
+  if(name==='recorrida'){actualizarCatalogos();renderRecorrida();}
+  if(name==='reporte'){actualizarCatalogos();renderReporte();}
+  if(name==='datos')actualizarCatalogos();
+}
+
+function showMsg(msg,tipo){const el=document.getElementById('form-msg');el.textContent=msg;el.className='form-msg '+tipo;el.style.display='block';}
+function hideMsg(){const el=document.getElementById('form-msg');if(el)el.style.display='none';}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+
+(async function init(){
+  try{await DB.init();}catch(e){DB._d=[];DB._h={};DB._r={};}
+  document.getElementById('loading-overlay').classList.add('hidden');
+  recSession=DB.recDatos();
+  actualizarCatalogos();renderPanel();renderListado();
+  document.getElementById('rec-fecha-txt').textContent=`Hoy: ${new Date().toLocaleDateString('es-AR',{dateStyle:'full'})}`;
+})();
+</script>
+</body>
+</html>

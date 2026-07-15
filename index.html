@@ -353,7 +353,10 @@ body{padding:0!important}
   <div class="filtros no-print">
     <div class="fg"><label>Incluir</label><select id="rpt-filtro" onchange="renderReporte()"><option value="todos">Todos</option><option value="vencido">Vencidos</option><option value="fisico">Estado fisico</option><option value="recipiente">Recipiente</option></select></div>
     <div class="fg"><label>Sector</label><select id="rpt-sector" onchange="renderReporte()"><option value="">Todos</option></select></div>
-    <div class="fg" style="flex-direction:row;align-items:flex-end;gap:.4rem;min-width:auto"><button class="btn btn-dark btn-sm" onclick="imprimirReporte()">Imprimir</button></div>
+    <div class="fg" style="flex-direction:row;align-items:flex-end;gap:.4rem;min-width:auto">
+      <button class="btn btn-dark btn-sm" onclick="imprimirReporte()">🖨️ Imprimir</button>
+      <button class="btn btn-primary btn-sm" onclick="descargarReporte()">⬇️ Descargar PDF</button>
+    </div>
   </div>
   <div id="rpt-body"></div>
 </div>
@@ -566,6 +569,117 @@ function renderReporte(){
   document.getElementById('rpt-body').innerHTML=html;
 }
 function imprimirReporte(){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('view-reporte').classList.add('active');setTimeout(()=>window.print(),150);}
+
+function descargarReporte(){
+  const filtro=document.getElementById('rpt-filtro')?.value||'todos';
+  const sector=document.getElementById('rpt-sector')?.value||'';
+  const hoy=new Date().toLocaleDateString('es-AR',{dateStyle:'long'});
+  const fecha=new Date().toISOString().slice(0,10);
+
+  let data=DB.todos().filter(m=>{
+    if(sector&&m.sector!==sector)return false;
+    const is=gP(m);if(!is.length)return false;
+    if(filtro==='vencido')return is.some(i=>i.tipo==='venc');
+    if(filtro==='fisico')return is.some(i=>i.tipo==='fisico');
+    if(filtro==='recipiente')return is.some(i=>i.tipo==='recip');
+    return true;
+  });
+  data.sort((a,b)=>{const pa=pM(gP(a)),pb=pM(gP(b));return pa!==pb?pa-pb:a.sector.localeCompare(b.sector);});
+
+  const grupos={};data.forEach(m=>{const p=pM(gP(m));if(!grupos[p])grupos[p]=[];grupos[p].push(m);});
+  const pLabel=p=>p===1?'CRITICO':p===2?'ALTO':p===3?'MEDIO':'OBSERVACIONES';
+  const pColor=p=>p===1?'#B83228':p===2?'#D4691A':p===3?'#D4B800':'#ADADAD';
+
+  let filas='';
+  [1,2,3,4].forEach(p=>{
+    if(!grupos[p])return;
+    filas+=`<tr><td colspan="7" style="background:${pColor(p)};color:${p===3?'#1A1A1A':'#fff'};font-weight:700;font-size:12px;padding:6px 10px;letter-spacing:.05em">${pLabel(p)} — ${grupos[p].length} equipo${grupos[p].length!==1?'s':''}</td></tr>`;
+    grupos[p].forEach(m=>{
+      const is=gP(m);
+      const issues=is.map(i=>i.label).join(', ');
+      const accList=ac(m,is);
+      const dp=dH(m.vph),dc=dH(m.carga);
+      const estColor=gE(m)==='vencido'?'#B83228':gE(m)==='proximo'?'#D4691A':'#1E9154';
+      filas+=`<tr>
+        <td style="font-family:monospace;font-weight:700;border-left:4px solid ${pColor(p)}">${m.idInterno}</td>
+        <td>${m.sector}</td>
+        <td>${m.tipo} ${m.kg}kg${m.anio?' — Fab.'+m.anio:''}</td>
+        <td>PH: ${fF(m.vph)}${dp!==null&&dp<0?' (VENC '+Math.abs(dp)+'d)':dp!==null&&dp<=30?' ('+dp+'d)':''}<br>Carga: ${fF(m.carga)}${dc!==null&&dc<0?' (VENC '+Math.abs(dc)+'d)':dc!==null&&dc<=30?' ('+dc+'d)':''}</td>
+        <td style="color:${estColor};font-weight:600">${issues}</td>
+        <td>${accList}</td>
+        <td>${m.obs||''}</td>
+      </tr>`;
+    });
+  });
+
+  const html=`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte Matafuegos - CoopMorteros - ${fecha}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:11px;color:#1A1A1A;margin:0;padding:1.5cm}
+  h1{font-size:18px;font-weight:700;margin:0 0 4px}
+  .sub{font-size:11px;color:#555;margin-bottom:2px}
+  .header-block{border-bottom:3px solid #1A1A1A;padding-bottom:10px;margin-bottom:16px}
+  .intro{font-size:11px;line-height:1.6;margin-bottom:16px;color:#333}
+  .resumen{display:flex;gap:12px;margin-bottom:16px}
+  .res-item{border:1px solid #ddd;border-radius:6px;padding:8px 14px;text-align:center;min-width:80px}
+  .res-num{font-size:22px;font-weight:700;font-family:monospace}
+  .res-lbl{font-size:10px;color:#666;text-transform:uppercase}
+  .res-rojo .res-num{color:#B83228}.res-naranja .res-num{color:#D4691A}.res-verde .res-num{color:#1E9154}.res-violeta .res-num{color:#6B48C8}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+  th{background:#1A1A1A;color:#fff;padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+  td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:10.5px}
+  tr:nth-child(even) td{background:#fafafa}
+  .firma{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:30px;border-top:2px solid #1A1A1A;padding-top:10px}
+  .firma-campo{text-align:center}
+  .firma-linea{border-top:1px solid #1A1A1A;margin-top:40px;padding-top:4px;font-size:10px;color:#666}
+  .footer{text-align:center;font-size:9px;color:#999;margin-top:20px;border-top:1px solid #eee;padding-top:8px}
+  @media print{body{padding:.8cm}button{display:none}}
+</style>
+</head>
+<body>
+<div class="header-block">
+  <h1>Reporte de Mantenimiento — Matafuegos</h1>
+  <div class="sub">Cooperativa de Servicios Publicos de Morteros Ltda. — CoopMorteros</div>
+  <div class="sub"><strong>Fecha:</strong> ${hoy} &nbsp;|&nbsp; <strong>Destinatario:</strong> Area de Mantenimiento</div>
+</div>
+<div class="intro">
+  Por medio del presente se informa al Area de Mantenimiento que, como resultado del control periodico de extintores
+  realizado con fecha <strong>${hoy}</strong>, se detectaron <strong>${data.length} equipo${data.length!==1?'s':''}</strong>
+  que requieren intervencion. Se solicita tomar las acciones correspondientes segun el nivel de prioridad asignado.
+</div>
+<div class="resumen">
+  <div class="res-item res-azul"><div class="res-num" style="color:#1F6FAB">${DB.todos().length}</div><div class="res-lbl">Total registrados</div></div>
+  <div class="res-item res-rojo"><div class="res-num" style="color:#B83228">${grupos[1]?grupos[1].length:0}</div><div class="res-lbl">Critico</div></div>
+  <div class="res-item res-naranja"><div class="res-num" style="color:#D4691A">${grupos[2]?grupos[2].length:0}</div><div class="res-lbl">Alto</div></div>
+  <div class="res-item res-verde"><div class="res-num" style="color:#D4B800">${grupos[3]?grupos[3].length:0}</div><div class="res-lbl">Medio</div></div>
+</div>
+${data.length===0?'<p style="text-align:center;color:#1E9154;font-weight:600;padding:20px">No hay equipos con problemas para el filtro seleccionado.</p>':`
+<table>
+  <thead><tr><th>N Interno</th><th>Sector</th><th>Equipo</th><th>Fechas</th><th>Problemas</th><th>Accion requerida</th><th>Observaciones</th></tr></thead>
+  <tbody>${filas}</tbody>
+</table>`}
+<div class="firma">
+  <div class="firma-campo"><div class="firma-linea">Responsable H&S</div></div>
+  <div class="firma-campo"><div class="firma-linea">Responsable Mantenimiento</div></div>
+  <div class="firma-campo"><div class="firma-linea">Fecha de resolucion</div></div>
+</div>
+<div class="footer">Documento generado por el Sistema de Control de Matafuegos — CoopMorteros. Solo valido a la fecha de emision.</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body>
+</html>`;
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='Reporte_Matafuegos_CoopMorteros_'+fecha+'.html';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Reporte generado — abrilo y usa Imprimir → Guardar como PDF');
+}
 
 // ── EXPORT/IMPORT ─────────────────────────────────────────────
 function exportarJSON(){const blob=new Blob([JSON.stringify(DB.exportar(),null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='matafuegos_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(url);toast('Exportado');}
